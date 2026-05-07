@@ -13,9 +13,9 @@ def route_topic_prompt(task_input: dict[str, Any]) -> str:
         "reason": "short reason",
     }
     return (
-        "You route an input to one topic key. Return JSON only.\\n"
-        f"Allowed keys: {list(task_input.get('topics', {}).keys())} and fallback={task_input.get('fallback_key')}\\n"
-        f"Output schema: {json.dumps(schema)}\\n"
+        "You route an input to one topic key. Return JSON only.\n"
+        f"Allowed keys: {list(task_input.get('topics', {}).keys())} and fallback={task_input.get('fallback_key')}\n"
+        f"Output schema: {json.dumps(schema)}\n"
         f"Input payload: {json.dumps(task_input, ensure_ascii=False)}"
     )
 
