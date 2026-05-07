@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "copilot-service"
+version = "0.1.0"
+description = "Local Copilot as a Service wrapper with CLI and REST API"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "copilot-service" }]
+dependencies = []
+
+[project.scripts]
+copilot-service = "copilot_service.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

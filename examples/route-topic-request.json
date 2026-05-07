@@ -1,0 +1,25 @@
+{
+  "task": "route-topic",
+  "model": "gpt-5-mini",
+  "input": {
+    "title": "Whisper model update",
+    "message": "Transcription quality improved.",
+    "article_excerpt": "New ASR benchmark details...",
+    "topics": {
+      "asr": {
+        "topic": "AI/ASR",
+        "path": "2_Areas/ai-systems",
+        "aliases": ["whisper", "asr", "transcription"]
+      },
+      "fallback": {
+        "topic": "Fallback",
+        "path": "0_Inbox",
+        "aliases": []
+      }
+    },
+    "fallback_key": "fallback"
+  },
+  "options": {
+    "fallback_on_invalid": true
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "task": "freeform",
+  "model": "gpt-5-mini",
+  "input": {
+    "prompt": "Explain this"
+  },
+  "options": {}
+}
