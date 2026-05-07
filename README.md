@@ -1,5 +1,7 @@
 # copilot-service
 
+![copilot-as-a-service](assets/caas.png)
+
 `copilot-service` provides a stable local CLI and REST wrapper around Copilot/LLM CLI tooling so scripts and agents can call a normalized task API.
 
 ## What problem this solves
