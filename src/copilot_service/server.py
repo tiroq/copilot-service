@@ -28,7 +28,13 @@ def create_handler(config: ServiceConfig):
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not found"})
 
         def do_POST(self) -> None:  # noqa: N802
-            length = int(self.headers.get("Content-Length", "0"))
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+                if length < 0:
+                    raise ValueError("negative content length")
+            except (TypeError, ValueError):
+                self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "invalid Content-Length"})
+                return
             body = self.rfile.read(length) if length else b"{}"
             try:
                 payload = json.loads(body.decode("utf-8") or "{}")
@@ -42,8 +48,12 @@ def create_handler(config: ServiceConfig):
                 return
 
             if self.path == "/v1/tasks/route-topic":
-                if "task" in payload:
-                    request = payload
+                if isinstance(payload, dict) and "task" in payload:
+                    if payload.get("task") != "route-topic":
+                        self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "task must be route-topic"})
+                        return
+                    request = dict(payload)
+                    request["task"] = "route-topic"
                 else:
                     request = {"task": "route-topic", "input": payload, "options": {}}
                 response = run_bridge_request(request, config=config)

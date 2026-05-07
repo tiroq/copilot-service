@@ -31,6 +31,23 @@ class CliTests(unittest.TestCase):
         for py_file in root.rglob("*.py"):
             py_compile.compile(str(py_file), doraise=True)
 
+    def test_invalid_stdin_json_returns_error_code(self):
+        out = io.StringIO()
+        with patch("sys.stdin", io.StringIO("{")), redirect_stdout(out):
+            code = main(["ask", "--stdin"])
+        self.assertEqual(code, 2)
+        payload = json.loads(out.getvalue())
+        self.assertFalse(payload["ok"])
+        self.assertEqual(payload["errors"][0]["code"], "invalid_request")
+
+    def test_unknown_task_returns_non_zero_exit(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            code = main(["ask", "--task", "missing-task"])
+        self.assertEqual(code, 1)
+        payload = json.loads(out.getvalue())
+        self.assertFalse(payload["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

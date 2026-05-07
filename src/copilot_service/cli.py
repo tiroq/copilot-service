@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from typing import Any
 
 from copilot_service.config import ServiceConfig
 from copilot_service.runner import run_bridge_request
@@ -44,12 +45,25 @@ def _load_request(args: argparse.Namespace) -> dict[str, object]:
     raise SystemExit("Provide --input, --stdin, or --task")
 
 
+def _cli_error_response(message: str, provider: str, model: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "task": "",
+        "provider": provider,
+        "model": model,
+        "content": {},
+        "raw_text": None,
+        "errors": [{"code": "invalid_request", "message": message}],
+        "meta": {"duration_ms": 0, "attempts": 1},
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+    cfg = ServiceConfig.from_env()
 
     if args.command == "serve":
-        cfg = ServiceConfig.from_env()
         if args.host:
             cfg.host = args.host
         if args.port:
@@ -57,10 +71,16 @@ def main(argv: list[str] | None = None) -> int:
         run_server(cfg)
         return 0
 
-    request = _load_request(args)
-    response = run_bridge_request(request, config=ServiceConfig.from_env())
+    try:
+        request = _load_request(args)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        response = _cli_error_response(str(exc), provider=cfg.provider, model=cfg.model)
+        print(json.dumps(response, ensure_ascii=False))
+        return 2
+
+    response = run_bridge_request(request, config=cfg)
     print(json.dumps(response, ensure_ascii=False))
-    return 0
+    return 0 if response.get("ok") else 1
 
 
 if __name__ == "__main__":  # pragma: no cover
