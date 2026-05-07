@@ -7,7 +7,7 @@ import re
 from json import JSONDecodeError
 from typing import Any
 
-_FENCE_RE = re.compile(r"```(?:json)?\\s*(.*?)\\s*```", re.IGNORECASE | re.DOTALL)
+_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.IGNORECASE | re.DOTALL)
 
 
 def extract_json_value(text: str) -> Any:
