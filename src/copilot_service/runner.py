@@ -39,7 +39,7 @@ def run_bridge_request(request_payload: dict[str, Any], config: ServiceConfig | 
     task_impl = TASKS[req.task]
     prompt = task_impl.build_prompt(req.input)
     active_provider = provider or create_provider(cfg)
-    provider_result = active_provider.ask(prompt=prompt, model=req.model, options=req.options)
+    provider_result = active_provider.ask(prompt, req.model, req.options)
 
     if provider_result.error:
         errors.append({"code": "provider_error", "message": provider_result.error})

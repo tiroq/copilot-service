@@ -10,8 +10,7 @@ class _StaticProvider(Provider):
     def __init__(self, result: ProviderResult):
         self._result = result
 
-    def ask(self, prompt: str, model: str, options: dict[str, object]) -> ProviderResult:
-        _ = (prompt, model, options)
+    def ask(self, _prompt: str, _model: str, _options: dict[str, object]) -> ProviderResult:
         return self._result
 
 

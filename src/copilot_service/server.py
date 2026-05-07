@@ -52,7 +52,7 @@ def create_handler(config: ServiceConfig):
                     if payload.get("task") != "route-topic":
                         self._json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "task must be route-topic"})
                         return
-                    request = dict(payload)
+                    request = payload
                 else:
                     request = {"task": "route-topic", "input": payload, "options": {}}
                 response = run_bridge_request(request, config=config)
