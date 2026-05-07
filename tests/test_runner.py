@@ -11,6 +11,7 @@ class _StaticProvider(Provider):
         self._result = result
 
     def ask(self, prompt: str, model: str, options: dict[str, object]) -> ProviderResult:
+        _ = (prompt, model, options)
         return self._result
 
 
