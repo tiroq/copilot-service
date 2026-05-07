@@ -47,7 +47,7 @@ def run_bridge_request(request_payload: dict[str, Any], config: ServiceConfig | 
     parsed_ok, content, parse_errors = task_impl.parse_output(provider_result.raw_text, req.input, req.options)
     errors.extend(parse_errors)
 
-    ok = parsed_ok and provider_result.ok and (req.task != "route-topic" or bool(content))
+    ok = _is_task_successful(task=req.task, parsed_ok=parsed_ok, provider_ok=provider_result.ok, content=content)
     return _response(
         ok=ok,
         task=req.task,
@@ -83,3 +83,11 @@ def _response(
         meta={"duration_ms": duration_ms, "attempts": 1},
     )
     return response.to_dict()
+
+
+def _is_task_successful(*, task: str, parsed_ok: bool, provider_ok: bool, content: dict[str, Any]) -> bool:
+    if not (parsed_ok and provider_ok):
+        return False
+    if task == "route-topic":
+        return bool(content)
+    return True
