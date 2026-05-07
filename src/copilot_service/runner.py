@@ -47,7 +47,7 @@ def run_bridge_request(request_payload: dict[str, Any], config: ServiceConfig | 
     parsed_ok, content, parse_errors = task_impl.parse_output(provider_result.raw_text, req.input, req.options)
     errors.extend(parse_errors)
 
-    ok = parsed_ok and provider_result.ok
+    ok = parsed_ok and provider_result.ok and (req.task != "route-topic" or bool(content))
     return _response(
         ok=ok,
         task=req.task,

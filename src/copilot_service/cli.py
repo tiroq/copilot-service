@@ -61,9 +61,9 @@ def _cli_error_response(message: str, provider: str, model: str) -> dict[str, An
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
-    cfg = ServiceConfig.from_env()
 
     if args.command == "serve":
+        cfg = ServiceConfig.from_env()
         if args.host:
             cfg.host = args.host
         if args.port:
@@ -71,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
         run_server(cfg)
         return 0
 
+    cfg = ServiceConfig.from_env()
     try:
         request = _load_request(args)
     except (OSError, json.JSONDecodeError, ValueError) as exc:
