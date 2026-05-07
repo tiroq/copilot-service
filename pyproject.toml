@@ -1,21 +1,35 @@
 [build-system]
-requires = ["setuptools>=68"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
 
 [project]
-name = "copilot-service"
+name = "copilot-caas"
 version = "0.1.0"
-description = "Local Copilot as a Service wrapper with CLI and REST API"
+description = "Local Copilot as a Service wrapper with CLI and REST APIs."
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "copilot-service" }]
-dependencies = []
+license = "MIT"
+authors = [
+  { name = "Ivan Shamray" }
+]
+keywords = ["copilot", "llm", "cli", "rest", "automation", "agent"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development",
+  "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/tiroq/copilot-service"
+Repository = "https://github.com/tiroq/copilot-service"
+Issues = "https://github.com/tiroq/copilot-service/issues"
 
 [project.scripts]
 copilot-service = "copilot_service.cli:main"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
