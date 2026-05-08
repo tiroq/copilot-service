@@ -1,0 +1,295 @@
+version: "3"
+
+vars:
+  PYTHON: '{{default ".venv/bin/python" .PYTHON}}'
+  PACKAGE_NAME: copilot-caas
+  CHANGELOG: CHANGELOG.md
+  PYPROJECT: pyproject.toml
+
+tasks:
+  release:current:
+    desc: Print current package version from pyproject.toml
+    cmds:
+      - |
+        {{.PYTHON}} - <<'PY'
+        import tomllib
+        with open("{{.PYPROJECT}}", "rb") as f:
+            data = tomllib.load(f)
+        print(data["project"]["version"])
+        PY
+
+  release:next:
+    desc: "Calculate next version. Usage: task release:next -- patch|minor|major"
+    cmds:
+      - |
+        BUMP="{{.CLI_ARGS}}"
+        if [ -z "$BUMP" ]; then BUMP="patch"; fi
+
+        {{.PYTHON}} - "$BUMP" <<'PY'
+        import sys, tomllib
+
+        bump = sys.argv[1]
+        with open("pyproject.toml", "rb") as f:
+            version = tomllib.load(f)["project"]["version"]
+
+        major, minor, patch = map(int, version.split("."))
+
+        if bump == "patch":
+            patch += 1
+        elif bump == "minor":
+            minor += 1
+            patch = 0
+        elif bump == "major":
+            major += 1
+            minor = 0
+            patch = 0
+        else:
+            raise SystemExit(f"unsupported bump type: {bump}")
+
+        print(f"{major}.{minor}.{patch}")
+        PY
+
+  release:bump:
+    desc: "Bump pyproject version and changelog. Usage: task release:bump -- patch \"Release notes\""
+    cmds:
+      - |
+        set -euo pipefail
+
+        BUMP="$(printf '%s\n' "{{.CLI_ARGS}}" | awk '{print $1}')"
+        NOTES="$(printf '%s\n' "{{.CLI_ARGS}}" | cut -d' ' -f2-)"
+
+        if [ -z "$BUMP" ]; then
+          BUMP="patch"
+        fi
+
+        if [ -z "$NOTES" ] || [ "$NOTES" = "$BUMP" ]; then
+          NOTES="- Maintenance release."
+        fi
+
+        {{.PYTHON}} - "$BUMP" "$NOTES" <<'PY'
+        import datetime as dt
+        import re
+        import sys
+        import tomllib
+        from pathlib import Path
+
+        bump = sys.argv[1]
+        notes = sys.argv[2]
+
+        pyproject = Path("pyproject.toml")
+        changelog = Path("CHANGELOG.md")
+
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        current = data["project"]["version"]
+
+        if not re.fullmatch(r"\d+\.\d+\.\d+", current):
+            raise SystemExit(f"version is not semver X.Y.Z: {current}")
+
+        major, minor, patch = map(int, current.split("."))
+
+        if bump == "patch":
+            patch += 1
+        elif bump == "minor":
+            minor += 1
+            patch = 0
+        elif bump == "major":
+            major += 1
+            minor = 0
+            patch = 0
+        else:
+            raise SystemExit(f"unsupported bump type: {bump}")
+
+        next_version = f"{major}.{minor}.{patch}"
+
+        text = pyproject.read_text(encoding="utf-8")
+        text, count = re.subn(
+            r'(?m)^version\s*=\s*"[^"]+"',
+            f'version = "{next_version}"',
+            text,
+            count=1,
+        )
+        if count != 1:
+            raise SystemExit("could not update version in pyproject.toml")
+        pyproject.write_text(text, encoding="utf-8")
+
+        today = dt.date.today().isoformat()
+        section = f"## {next_version} - {today}\n\n{notes.strip()}\n\n"
+
+        if changelog.exists():
+            old = changelog.read_text(encoding="utf-8")
+            if old.startswith("# Changelog\n"):
+                new = "# Changelog\n\n" + section + old[len("# Changelog\n"):].lstrip()
+            else:
+                new = "# Changelog\n\n" + section + old
+        else:
+            new = "# Changelog\n\n" + section
+
+        changelog.write_text(new, encoding="utf-8")
+
+        print(next_version)
+        PY
+
+  release:check-version:
+    desc: "Verify git tag version matches pyproject.toml. Usage: task release:check-version -- v0.1.3"
+    cmds:
+      - |
+        set -euo pipefail
+
+        TAG="{{.CLI_ARGS}}"
+        if [ -z "$TAG" ]; then
+          echo "Usage: task release:check-version -- v0.1.3" >&2
+          exit 2
+        fi
+
+        TAG_VERSION="${TAG#v}"
+
+        PROJECT_VERSION="$({{.PYTHON}} - <<'PY'
+        import tomllib
+        with open("pyproject.toml", "rb") as f:
+            print(tomllib.load(f)["project"]["version"])
+        PY
+        )"
+
+        if [ "$TAG_VERSION" != "$PROJECT_VERSION" ]; then
+          echo "Version mismatch: tag=$TAG_VERSION pyproject=$PROJECT_VERSION" >&2
+          exit 1
+        fi
+
+        echo "Version OK: $PROJECT_VERSION"
+
+  release:validate:
+    desc: Run release validation checks
+    cmds:
+      - |
+        set -euo pipefail
+        {{.PYTHON}} -m compileall src tests -q
+        PYTHONPATH=src {{.PYTHON}} -m pytest -q
+        rm -rf dist build *.egg-info src/*.egg-info
+        {{.PYTHON}} -m build
+        {{.PYTHON}} -m twine check dist/*
+        ls -la dist/
+
+  release:tag:
+    desc: Create annotated release tag from current pyproject version
+    cmds:
+      - |
+        set -euo pipefail
+
+        VERSION="$({{.PYTHON}} - <<'PY'
+        import tomllib
+        with open("pyproject.toml", "rb") as f:
+            print(tomllib.load(f)["project"]["version"])
+        PY
+        )"
+
+        TAG="v${VERSION}"
+
+        if git rev-parse "$TAG" >/dev/null 2>&1; then
+          echo "Tag already exists locally: $TAG" >&2
+          exit 1
+        fi
+
+        if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
+          echo "Tag already exists remotely: $TAG" >&2
+          exit 1
+        fi
+
+        git tag -a "$TAG" -m "Release $TAG"
+        echo "Created tag $TAG"
+
+  release:push:
+    desc: "Push current branch and current version tag"
+    cmds:
+      - |
+        set -euo pipefail
+
+        BRANCH="$(git branch --show-current)"
+        VERSION="$({{.PYTHON}} - <<'PY'
+        import tomllib
+        with open("pyproject.toml", "rb") as f:
+            print(tomllib.load(f)["project"]["version"])
+        PY
+        )"
+
+        TAG="v${VERSION}"
+
+        git push origin "$BRANCH"
+        git push origin "$TAG"
+
+        echo "Pushed $BRANCH and $TAG"
+        echo "GitHub Actions publish workflow should publish {{.PACKAGE_NAME}} $VERSION to PyPI."
+
+  release:patch:
+    desc: "Bump patch, validate, commit, tag, push. Usage: task release:patch -- \"Release notes\""
+    cmds:
+      - task: release:run
+        vars:
+          BUMP: patch
+          NOTES: '{{.CLI_ARGS}}'
+
+  release:minor:
+    desc: "Bump minor, validate, commit, tag, push. Usage: task release:minor -- \"Release notes\""
+    cmds:
+      - task: release:run
+        vars:
+          BUMP: minor
+          NOTES: '{{.CLI_ARGS}}'
+
+  release:major:
+    desc: "Bump major, validate, commit, tag, push. Usage: task release:major -- \"Release notes\""
+    cmds:
+      - task: release:run
+        vars:
+          BUMP: major
+          NOTES: '{{.CLI_ARGS}}'
+
+  release:run:
+    internal: true
+    desc: Internal full release task
+    cmds:
+      - |
+        set -euo pipefail
+
+        if [ -n "$(git status --porcelain)" ]; then
+          echo "Worktree is dirty. Commit/stash changes before release." >&2
+          git status --short
+          exit 1
+        fi
+      - task: release:bump
+        vars:
+          CLI_ARGS: '{{.BUMP}} {{.NOTES}}'
+      - task: release:validate
+      - |
+        set -euo pipefail
+
+        VERSION="$({{.PYTHON}} - <<'PY'
+        import tomllib
+        with open("pyproject.toml", "rb") as f:
+            print(tomllib.load(f)["project"]["version"])
+        PY
+        )"
+
+        TAG="v${VERSION}"
+
+        git add pyproject.toml CHANGELOG.md
+        git commit -m "release: ${TAG}"
+
+        if git rev-parse "$TAG" >/dev/null 2>&1; then
+          echo "Tag already exists locally: $TAG" >&2
+          exit 1
+        fi
+
+        if git ls-remote --exit-code --tags origin "$TAG" >/dev/null 2>&1; then
+          echo "Tag already exists remotely: $TAG" >&2
+          exit 1
+        fi
+
+        git tag -a "$TAG" -m "Release $TAG"
+
+        BRANCH="$(git branch --show-current)"
+        git push origin "$BRANCH"
+        git push origin "$TAG"
+
+        echo
+        echo "Release created: $TAG"
+        echo "PyPI publish should start from GitHub Actions tag workflow."
