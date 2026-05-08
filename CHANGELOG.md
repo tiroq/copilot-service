@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Added documented API contract (`docs/api-contract.md`).
+- Added Python client library (`copilot_service.client.CopilotServiceClient`).
+- Enriched `/health` endpoint with `status`, `service`, `version`, and `default_model` fields.
+
 ## 0.2.0 - 2026-05-08
 
 - Maintenance release.

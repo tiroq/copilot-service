@@ -5,10 +5,18 @@ from __future__ import annotations
 import json
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from typing import Any
 
 from copilot_service.config import ServiceConfig
 from copilot_service.runner import run_bridge_request
+
+
+def _service_version() -> str:
+    try:
+        return _pkg_version("copilot-caas")
+    except PackageNotFoundError:
+        return "0.0.0-dev"
 
 
 def create_handler(config: ServiceConfig):
@@ -23,7 +31,13 @@ def create_handler(config: ServiceConfig):
 
         def do_GET(self) -> None:  # noqa: N802
             if self.path == "/health":
-                self._json(HTTPStatus.OK, {"ok": True})
+                self._json(HTTPStatus.OK, {
+                    "ok": True,
+                    "status": "ok",
+                    "service": "copilot-service",
+                    "version": _service_version(),
+                    "default_model": config.model,
+                })
                 return
             self._json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not found"})
 

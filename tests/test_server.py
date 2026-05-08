@@ -20,7 +20,9 @@ class ServerTests(unittest.TestCase):
             port = server.server_address[1]
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=5) as response:
                 payload = json.loads(response.read().decode("utf-8"))
-            self.assertEqual(payload, {"ok": True})
+            self.assertTrue(payload.get("ok"))
+            self.assertEqual(payload.get("status"), "ok")
+            self.assertIn("service", payload)
         finally:
             server.shutdown()
             server.server_close()

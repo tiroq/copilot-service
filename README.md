@@ -13,6 +13,28 @@ Different LLM CLIs have different prompt formats and output styles. This project
 Automated releases are available through GitHub Actions.
 See [docs/release.md](docs/release.md) for full instructions.
 
+## Python client
+
+```python
+from copilot_service.client import CopilotServiceClient
+
+client = CopilotServiceClient()  # connects to http://127.0.0.1:8765
+
+result = client.freeform("Explain this error")
+if result.ok:
+    print(result.content["text"])
+
+result = client.route_topic(
+    title="Article title",
+    message="Full message",
+    article_excerpt="...",
+    topics={"asr": "Speech Recognition", "nlp": "NLP"},
+)
+print(result.content["decision"])
+```
+
+See [docs/api-contract.md](docs/api-contract.md) for the full API contract.
+
 ## CLI UX
 
 Running `copilot-caas` with no arguments shows a colorful welcome screen and exits 0:
