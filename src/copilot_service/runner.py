@@ -57,6 +57,7 @@ def run_bridge_request(request_payload: dict[str, Any], config: ServiceConfig | 
         raw_text=provider_result.raw_text,
         errors=errors,
         started=started,
+        provider_debug=provider_result.provider_debug,
     )
 
 
@@ -70,8 +71,12 @@ def _response(
     raw_text: str | None,
     errors: list[dict[str, str]],
     started: float,
+    provider_debug: dict | None = None,
 ) -> dict[str, Any]:
     duration_ms = int((time.perf_counter() - started) * 1000)
+    meta: dict[str, Any] = {"duration_ms": duration_ms, "attempts": 1}
+    if provider_debug:
+        meta["provider_debug"] = provider_debug
     response = BridgeResponse(
         ok=ok,
         task=task,
@@ -80,6 +85,6 @@ def _response(
         content=content,
         raw_text=raw_text,
         errors=errors,
-        meta={"duration_ms": duration_ms, "attempts": 1},
+        meta=meta,
     )
     return response.to_dict()

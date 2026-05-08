@@ -10,6 +10,7 @@ from dataclasses import dataclass
 class ServiceConfig:
     provider: str = "shell"
     shell_command: str = ""
+    shell_mode: str = ""  # "" | "stdin" | "argv"
     model: str = "gpt-5-mini"
     timeout_seconds: int = 90
     host: str = "127.0.0.1"
@@ -21,6 +22,7 @@ class ServiceConfig:
         return cls(
             provider=os.getenv("COPILOT_SERVICE_PROVIDER", "shell").strip() or "shell",
             shell_command=os.getenv("COPILOT_SERVICE_SHELL_COMMAND", "").strip(),
+            shell_mode=os.getenv("COPILOT_SERVICE_SHELL_MODE", "").strip().lower(),
             model=os.getenv("COPILOT_SERVICE_MODEL", "gpt-5-mini").strip() or "gpt-5-mini",
             timeout_seconds=_parse_int(os.getenv("COPILOT_SERVICE_TIMEOUT_SECONDS"), 90),
             host=os.getenv("COPILOT_SERVICE_HOST", "127.0.0.1").strip() or "127.0.0.1",
