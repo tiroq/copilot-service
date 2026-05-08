@@ -113,3 +113,76 @@ See `examples/article-ingestion-usage.sh` for a simple pipeline wrapper around t
 ## Security note
 
 REST binds to `127.0.0.1` by default. The shell command is loaded only from local environment/config (never from request payload).
+
+## Debug systemd service
+
+If the service is installed via `scripts/install-systemd-user.sh` and requests fail, use these commands to diagnose.
+
+**Check the env file written by the installer:**
+
+```bash
+cat ~/.config/copilot-service/env
+```
+
+**Check service status:**
+
+```bash
+systemctl --user status copilot-service.service --no-pager
+```
+
+**Tail recent logs:**
+
+```bash
+journalctl --user -u copilot-service.service -n 120 --no-pager
+```
+
+**Show unit configuration (env file path and ExecStart):**
+
+```bash
+systemctl --user show copilot-service.service -p EnvironmentFiles -p ExecStart
+```
+
+**Health check:**
+
+```bash
+curl -s http://127.0.0.1:8765/health | jq .
+```
+
+**Route-topic API call:**
+
+```bash
+curl -s http://127.0.0.1:8765/v1/tasks/route-topic \
+  -H 'Content-Type: application/json' \
+  --data-binary @/tmp/route-topic-request.json | jq .
+```
+
+**Direct provider check** (replace `/path/to/copilot` with the value of `COPILOT_SERVICE_SHELL_COMMAND` in the env file):
+
+```bash
+/path/to/copilot \
+  -p 'Return only this exact JSON and nothing else: {"ok":true}' \
+  --model gpt-5-mini \
+  --silent \
+  --no-color \
+  --no-auto-update \
+  --stream off \
+  --no-custom-instructions \
+  --no-ask-user \
+  --available-tools=
+```
+
+Expected output (the leading `● ` bullet is stripped automatically by the JSON extractor):
+
+```
+● {"ok":true}
+```
+
+**Shell provider modes** (`COPILOT_SERVICE_SHELL_MODE`):
+
+| Value | Behavior |
+|-------|----------|
+| `argv` | Prompt passed via `-p` flag; uses `shell=False`. Required for GitHub Copilot CLI. |
+| `stdin` | Prompt piped to subprocess stdin; uses `shell=True`. Original default. |
+| `` (empty) | Same as `stdin` — backward-compatible default. |
+
+The installer sets `COPILOT_SERVICE_SHELL_MODE=argv` automatically.
