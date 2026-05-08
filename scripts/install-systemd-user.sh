@@ -122,16 +122,6 @@ COPILOT_SERVICE_MODEL=$MODEL
 COPILOT_SERVICE_TIMEOUT_SECONDS=$TIMEOUT
 COPILOT_SERVICE_HOST=$HOST
 COPILOT_SERVICE_PORT=$PORT
-
-# GitHub Copilot CLI non-interactive mode options
-COPILOT_SERVICE_COPILOT_SILENT=true
-COPILOT_SERVICE_COPILOT_NO_COLOR=true
-COPILOT_SERVICE_COPILOT_NO_AUTO_UPDATE=true
-COPILOT_SERVICE_COPILOT_STREAM=off
-COPILOT_SERVICE_COPILOT_NO_CUSTOM_INSTRUCTIONS=true
-COPILOT_SERVICE_COPILOT_NO_ASK_USER=true
-COPILOT_SERVICE_COPILOT_AVAILABLE_TOOLS=
-
 NO_COLOR=1
 EOF
 
@@ -172,6 +162,43 @@ curl -fsS "http://$HOST:$PORT/health" >/dev/null || {
   systemctl --user status copilot-service.service --no-pager || true
   fail "Service started but healthcheck failed"
 }
+
+if [[ "${COPILOT_SERVICE_SKIP_PROVIDER_SMOKE:-0}" != "1" ]]; then
+  log "Running route-topic smoke test"
+  _smoke_payload=$(mktemp)
+  cat > "$_smoke_payload" <<'PAYLOAD'
+{
+  "task": "route-topic",
+  "input": {
+    "title": "Smoke test",
+    "message": "",
+    "article_excerpt": "Smoke test for copilot-service installation.",
+    "topics": {
+      "test": {
+        "topic": "Test",
+        "path": "test",
+        "aliases": ["test", "smoke"]
+      }
+    },
+    "fallback_key": "fallback"
+  },
+  "options": {"fallback_on_invalid": false}
+}
+PAYLOAD
+  _smoke_out=$(curl -sS "http://$HOST:$PORT/v1/tasks/route-topic" \
+    -H 'Content-Type: application/json' \
+    --data-binary "@$_smoke_payload" 2>&1) || true
+  rm -f "$_smoke_payload"
+
+  if echo "$_smoke_out" | grep -q '"invalid_provider_output"'; then
+    warn "route-topic smoke test detected invalid_provider_output"
+    warn "Response: $_smoke_out"
+    warn "Check: cat $ENV_FILE"
+    warn "Check: journalctl --user -u copilot-service.service -n 40 --no-pager"
+    fail "Provider smoke test failed — shell provider returned invalid output"
+  fi
+  log "Smoke test passed"
+fi
 
 log "OK: copilot-service is running at http://$HOST:$PORT"
 log "Try: curl -sS http://$HOST:$PORT/health"
