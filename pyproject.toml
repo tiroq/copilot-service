@@ -32,4 +32,9 @@ Repository = "https://github.com/tiroq/copilot-service"
 Issues = "https://github.com/tiroq/copilot-service/issues"
 
 [project.scripts]
+copilot-caas = "copilot_service.cli:main"
 copilot-service = "copilot_service.cli:main"
+copilot-bridge = "copilot_service.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/copilot_service"]

@@ -47,7 +47,7 @@ jobs:
 
     environment:
       name: pypi
-      url: https://pypi.org/project/copilot-service/
+      url: https://pypi.org/project/copilot-caas/
 
     steps:
       - name: Download distributions artifact
