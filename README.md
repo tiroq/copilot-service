@@ -1,6 +1,6 @@
 # copilot-service
 
-![copilot-as-a-service](assets/caas.png)
+![copilot-as-a-service](https://raw.githubusercontent.com/tiroq/copilot-service/main/assets/caas.png)
 
 `copilot-service` provides a stable local CLI and REST wrapper around Copilot/LLM CLI tooling so scripts and agents can call a normalized task API.
 
