@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.2 - 2026-05-08
+
+- Fixed v0.1.2 release tag mismatch (pyproject.toml version was not bumped before tagging).
+- Added automated release workflow (`release.yml`) with version auto-increment.
+- Added `docs/release.md` release guide.
+- Colorful no-argument welcome screen (`copilot-caas` with no args exits 0).
+- Added `--version` flag and `copilot-caas` / `copilot-bridge` CLI entrypoints.
+- Fixed PyPI wheel build (missing `[tool.hatch.build.targets.wheel]` config).
+- Added `LICENSE` (MIT).
+
 ## 0.1.1 - 2026-05-08
 
 - Improved no-argument CLI behavior: running `copilot-caas` without arguments now shows a
