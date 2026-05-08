@@ -42,6 +42,23 @@ class JsonExtractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             extract_json_value("")
 
+    def test_raw_newline_in_string_value(self):
+        """LLM may produce JSON with literal newlines inside string values."""
+        text = '● {"decision":"ai_architecture","confidence":0.9,"reason":"line1\n  line2"}'
+        result = extract_json_value(text)
+        self.assertEqual(result["decision"], "ai_architecture")
+        self.assertAlmostEqual(result["confidence"], 0.9)
+        self.assertIn("line1", result["reason"])
+
+    def test_raw_newline_multiline_reason(self):
+        text = (
+            '{"decision":"x","confidence":0.8,"reason":"first line\n'
+            '  second line\n'
+            '  third line"}'
+        )
+        result = extract_json_value(text)
+        self.assertEqual(result["decision"], "x")
+
 
 if __name__ == "__main__":
     unittest.main()
