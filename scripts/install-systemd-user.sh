@@ -29,27 +29,107 @@ fail() {
   exit 1
 }
 
-detect_copilot_cli() {
-  if [[ -n "${COPILOT_CLI:-}" && -x "${COPILOT_CLI}" ]]; then
-    printf '%s\n' "$COPILOT_CLI"
-    return 0
+# Validate a single copilot CLI candidate with a hard timeout.
+# Returns 0 and prints the path if valid, 1 otherwise.
+_validate_candidate() {
+  local bin="$1"
+  [[ -x "$bin" ]] || return 1
+
+  local out
+  # Run with a hard 20-second timeout; kill the process on expiry.
+  out="$(timeout 20s "$bin" \
+    -p 'Return only this exact JSON and nothing else: {"ok":true}' \
+    --model "$MODEL" \
+    --silent \
+    --no-color \
+    --no-auto-update \
+    --stream off \
+    --no-custom-instructions \
+    --no-ask-user \
+    --available-tools= \
+    2>&1)" || {
+      local rc=$?
+      # timeout exits 124; any non-zero here means failure
+      if [[ $rc -eq 124 ]]; then
+        warn "  candidate timed out: $bin"
+      else
+        warn "  candidate exited $rc: $bin"
+      fi
+      return 1
+    }
+
+  # Reject output containing installer prompts or unknown-flag errors
+  if echo "$out" | grep -qF 'Install GitHub Copilot CLI?'; then
+    warn "  candidate shows installer prompt: $bin"
+    return 1
+  fi
+  if echo "$out" | grep -qF 'changed 2 packages'; then
+    warn "  candidate triggered npm install: $bin"
+    return 1
+  fi
+  if echo "$out" | grep -qE 'unknown option|unknown command'; then
+    warn "  candidate does not support required flags: $bin"
+    return 1
   fi
 
-  local vscode_cli
-  vscode_cli="$(find "$HOME/.vscode-server" "$HOME/.vscode" \
+  # Must contain {"ok": true} (with optional bullet prefix)
+  if ! echo "$out" | grep -q '"ok"[[:space:]]*:[[:space:]]*true'; then
+    warn "  candidate did not return {\"ok\":true}: $bin"
+    warn "  output was: $(echo "$out" | head -3)"
+    return 1
+  fi
+
+  printf '%s\n' "$bin"
+  return 0
+}
+
+# Find and validate the Copilot CLI binary.
+# Candidates tried in order:
+#   1. $COPILOT_CLI env var
+#   2. VS Code server extension path (exact)
+#   3. VS Code local extension path (exact)
+#   4. find fallback under ~/.vscode-server and ~/.vscode
+#   5. command -v copilot (last resort)
+detect_copilot_cli() {
+  local candidate result
+
+  # 1. Explicit override
+  if [[ -n "${COPILOT_CLI:-}" ]]; then
+    log "Trying COPILOT_CLI override: $COPILOT_CLI"
+    result="$(_validate_candidate "$COPILOT_CLI")" && { printf '%s\n' "$result"; return 0; }
+    fail "COPILOT_CLI was set to '$COPILOT_CLI' but validation failed — aborting"
+  fi
+
+  # 2. VS Code server extension (preferred)
+  candidate="$HOME/.vscode-server/data/User/globalStorage/github.copilot-chat/copilotCli/copilot"
+  if [[ -x "$candidate" ]]; then
+    log "Trying VS Code server path: $candidate"
+    result="$(_validate_candidate "$candidate")" && { printf '%s\n' "$result"; return 0; }
+  fi
+
+  # 3. VS Code local extension
+  candidate="$HOME/.vscode/data/User/globalStorage/github.copilot-chat/copilotCli/copilot"
+  if [[ -x "$candidate" ]]; then
+    log "Trying VS Code local path: $candidate"
+    result="$(_validate_candidate "$candidate")" && { printf '%s\n' "$result"; return 0; }
+  fi
+
+  # 4. find fallback under both vscode dirs
+  while IFS= read -r candidate; do
+    [[ -x "$candidate" ]] || continue
+    log "Trying found path: $candidate"
+    result="$(_validate_candidate "$candidate")" && { printf '%s\n' "$result"; return 0; }
+  done < <(find "$HOME/.vscode-server" "$HOME/.vscode" \
     -type f \
     -path '*/github.copilot-chat/copilotCli/copilot' \
-    2>/dev/null \
-    | head -n 1 || true)"
+    2>/dev/null || true)
 
-  if [[ -n "$vscode_cli" && -x "$vscode_cli" ]]; then
-    printf '%s\n' "$vscode_cli"
-    return 0
-  fi
-
+  # 5. PATH last resort — only accept if it validates cleanly
   if command -v copilot >/dev/null 2>&1; then
-    command -v copilot
-    return 0
+    candidate="$(command -v copilot)"
+    log "Trying PATH copilot: $candidate"
+    result="$(_validate_candidate "$candidate")" && { printf '%s\n' "$result"; return 0; }
+    warn "PATH copilot at $candidate failed validation (installer prompt or bad output) — skipping"
   fi
 
   return 1
@@ -74,27 +154,10 @@ fi
 
 COPILOT_BIN="$(detect_copilot_cli || true)"
 if [[ -z "$COPILOT_BIN" ]]; then
-  fail "Copilot CLI not found. Run with COPILOT_CLI=/path/to/copilot $0"
+  fail "No working Copilot CLI found. Set COPILOT_CLI=/path/to/copilot and re-run, or check 'journalctl --user -u copilot-service.service'"
 fi
 
-log "Using Copilot CLI: $COPILOT_BIN"
-
-log "Checking Copilot CLI non-interactive mode"
-
-if ! "$COPILOT_BIN" \
-  --model "$MODEL" \
-  -p 'Return only this exact JSON and nothing else: {"ok":true}' \
-  --silent \
-  --no-color \
-  --no-auto-update \
-  --stream off \
-  --no-custom-instructions \
-  --no-ask-user \
-  --available-tools= \
-  | grep -q '"ok"[[:space:]]*:[[:space:]]*true'
-then
-  fail "Copilot CLI non-interactive check failed"
-fi
+log "Validated Copilot CLI: $COPILOT_BIN"
 
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$SYSTEMD_USER_DIR"
 
