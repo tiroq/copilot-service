@@ -5,24 +5,42 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from typing import Any
 
 from copilot_service.config import ServiceConfig
 from copilot_service.runner import run_bridge_request
 from copilot_service.server import run_server
+from copilot_service.terminal import render_welcome, supports_color
+
+
+def _get_version() -> str:
+    try:
+        return _pkg_version("copilot-caas")
+    except PackageNotFoundError:
+        return "0.0.0-dev"
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="copilot-service")
-    sub = parser.add_subparsers(dest="command", required=True)
+    parser = argparse.ArgumentParser(
+        prog="copilot-caas",
+        description="Local Copilot backend for scripts & agents.",
+        add_help=True,
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"copilot-caas {_get_version()}",
+    )
+    sub = parser.add_subparsers(dest="command")
 
-    ask = sub.add_parser("ask", help="Run a single task")
+    ask = sub.add_parser("ask", help="Run a task through the configured provider")
     ask.add_argument("--input", dest="input_file", help="Path to request JSON")
     ask.add_argument("--stdin", action="store_true", help="Read request JSON from stdin")
     ask.add_argument("--task", help="Task name (for direct invocation)")
     ask.add_argument("--prompt", help="Prompt text (for freeform)")
 
-    serve = sub.add_parser("serve", help="Run HTTP API server")
+    serve = sub.add_parser("serve", help="Start local REST API server")
     serve.add_argument("--host", default=None)
     serve.add_argument("--port", default=None, type=int)
     return parser
@@ -61,6 +79,11 @@ def _cli_error_response(message: str, provider: str, model: str) -> dict[str, An
 def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    # No subcommand: show welcome screen and exit 0
+    if not args.command:
+        print(render_welcome(_get_version(), color_enabled=supports_color(sys.stdout)))
+        return 0
 
     if args.command == "serve":
         cfg = ServiceConfig.from_env()

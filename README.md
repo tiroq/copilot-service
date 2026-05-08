@@ -8,6 +8,28 @@
 
 Different LLM CLIs have different prompt formats and output styles. This project gives one stable contract for task-based calls (`route-topic`, `freeform`) and isolates provider setup in local config.
 
+## CLI UX
+
+Running `copilot-caas` with no arguments shows a colorful welcome screen and exits 0:
+
+```
+copilot-caas
+```
+
+Check the installed version:
+
+```
+copilot-caas --version
+```
+
+Run a task:
+
+```
+copilot-caas ask --input examples/route-topic-request.json
+```
+
+Colors are automatically disabled when `NO_COLOR` is set or output is not a TTY.
+
 ## Quickstart (fake provider)
 
 ```bash
