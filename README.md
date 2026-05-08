@@ -8,6 +8,11 @@
 
 Different LLM CLIs have different prompt formats and output styles. This project gives one stable contract for task-based calls (`route-topic`, `freeform`) and isolates provider setup in local config.
 
+## Releases
+
+Automated releases are available through GitHub Actions.
+See [docs/release.md](docs/release.md) for full instructions.
+
 ## CLI UX
 
 Running `copilot-caas` with no arguments shows a colorful welcome screen and exits 0:

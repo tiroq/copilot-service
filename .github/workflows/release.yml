@@ -1,0 +1,174 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        default: patch
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      notes:
+        description: "Release notes (one bullet per line, or leave blank for default)"
+        required: false
+        type: string
+      dry_run:
+        description: "Dry run: calculate version without committing or tagging"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: python -m pip install --upgrade pip build twine pytest hatchling
+
+      - name: Calculate and apply version bump
+        env:
+          BUMP: ${{ inputs.bump }}
+          NOTES: ${{ inputs.notes }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import sys
+          from datetime import date
+          from pathlib import Path
+
+          # ── Read current version from pyproject.toml ──────────────────────
+          toml_path = Path("pyproject.toml")
+          toml_text = toml_path.read_text(encoding="utf-8")
+          m = re.search(r'^version\s*=\s*"([^"]+)"', toml_text, re.MULTILINE)
+          if not m:
+              sys.exit("ERROR: Could not find version = \"...\" in pyproject.toml")
+          current = m.group(1)
+          parts = current.split(".")
+          if len(parts) != 3 or not all(p.isdigit() for p in parts):
+              sys.exit(f"ERROR: version '{current}' is not semantic X.Y.Z")
+          major, minor, patch = (int(p) for p in parts)
+
+          # ── Bump ───────────────────────────────────────────────────────────
+          bump = os.environ["BUMP"]
+          if bump == "major":
+              major += 1; minor = 0; patch = 0
+          elif bump == "minor":
+              minor += 1; patch = 0
+          else:
+              patch += 1
+          next_ver = f"{major}.{minor}.{patch}"
+          tag = f"v{next_ver}"
+
+          dry_run = os.environ.get("DRY_RUN", "false").lower() in ("true", "1", "yes")
+
+          # ── Check tag doesn't already exist ───────────────────────────────
+          import subprocess
+          existing_tags = subprocess.check_output(
+              ["git", "tag", "--list", tag], text=True
+          ).strip()
+          if existing_tags:
+              sys.exit(f"ERROR: Tag {tag} already exists locally. Bump again or delete the tag first.")
+
+          # ── Build CHANGELOG section ────────────────────────────────────────
+          raw_notes = os.environ.get("NOTES", "").strip()
+          if raw_notes:
+              note_lines = "\n".join(
+                  f"- {line.lstrip('- ').strip()}"
+                  for line in raw_notes.splitlines()
+                  if line.strip()
+              )
+          else:
+              note_lines = "- Maintenance release."
+          today = date.today().isoformat()
+          changelog_section = f"## {next_ver} - {today}\n\n{note_lines}\n"
+
+          print(f"Current version : {current}")
+          print(f"Bump type       : {bump}")
+          print(f"Next version    : {next_ver}")
+          print(f"Tag             : {tag}")
+          print(f"Dry run         : {dry_run}")
+          print()
+          print("Planned CHANGELOG section:")
+          print(changelog_section)
+
+          if dry_run:
+              print("Dry run mode — no files modified, no commit, no tag.")
+              sys.exit(0)
+
+          # ── Update pyproject.toml ──────────────────────────────────────────
+          new_toml = toml_text.replace(
+              f'version = "{current}"',
+              f'version = "{next_ver}"',
+              1,
+          )
+          if new_toml == toml_text:
+              sys.exit("ERROR: Failed to replace version in pyproject.toml")
+          toml_path.write_text(new_toml, encoding="utf-8")
+          print(f"Updated pyproject.toml: {current} -> {next_ver}")
+
+          # ── Update CHANGELOG.md ────────────────────────────────────────────
+          cl_path = Path("CHANGELOG.md")
+          if cl_path.exists():
+              cl_text = cl_path.read_text(encoding="utf-8")
+              # Insert after the first heading line (# Changelog ...) + blank line,
+              # or at the very top if no heading found.
+              header_match = re.match(r"(#[^\n]*\n(?:[^\n]*\n)*?\n)", cl_text)
+              if header_match:
+                  insert_at = header_match.end()
+                  new_cl = cl_text[:insert_at] + changelog_section + "\n" + cl_text[insert_at:]
+              else:
+                  new_cl = changelog_section + "\n" + cl_text
+          else:
+              new_cl = f"# Changelog\n\n{changelog_section}\n"
+          cl_path.write_text(new_cl, encoding="utf-8")
+          print("Updated CHANGELOG.md")
+
+          # ── Export for subsequent steps ────────────────────────────────────
+          github_env = os.environ.get("GITHUB_ENV", "")
+          if github_env:
+              with open(github_env, "a", encoding="utf-8") as fh:
+                  fh.write(f"NEXT_VERSION={next_ver}\n")
+                  fh.write(f"RELEASE_TAG={tag}\n")
+          PY
+
+      - name: Validate
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          python -m compileall src tests -q
+          PYTHONPATH=src python -m pytest -q
+          rm -rf dist build *.egg-info src/*.egg-info
+          python -m build
+          python -m twine check dist/*
+
+      - name: Commit and tag
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml CHANGELOG.md
+          git commit -m "release: ${RELEASE_TAG}"
+          git tag -a "${RELEASE_TAG}" -m "Release ${RELEASE_TAG}"
+          git push origin HEAD
+          git push origin "${RELEASE_TAG}"
+          echo ""
+          echo "✓ Tag ${RELEASE_TAG} pushed."
+          echo "  The publish.yml workflow will now build and publish copilot-caas ${NEXT_VERSION} to PyPI."
+          echo "  Monitor: https://github.com/${{ github.repository }}/actions"
