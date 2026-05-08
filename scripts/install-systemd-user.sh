@@ -35,11 +35,6 @@ detect_copilot_cli() {
     return 0
   fi
 
-  if command -v copilot >/dev/null 2>&1; then
-    command -v copilot
-    return 0
-  fi
-
   local vscode_cli
   vscode_cli="$(find "$HOME/.vscode-server" "$HOME/.vscode" \
     -type f \
@@ -49,6 +44,11 @@ detect_copilot_cli() {
 
   if [[ -n "$vscode_cli" && -x "$vscode_cli" ]]; then
     printf '%s\n' "$vscode_cli"
+    return 0
+  fi
+
+  if command -v copilot >/dev/null 2>&1; then
+    command -v copilot
     return 0
   fi
 
@@ -79,6 +79,23 @@ fi
 
 log "Using Copilot CLI: $COPILOT_BIN"
 
+log "Checking Copilot CLI non-interactive mode"
+
+if ! "$COPILOT_BIN" \
+  --model "$MODEL" \
+  -p 'Return only this exact JSON and nothing else: {"ok":true}' \
+  --silent \
+  --no-color \
+  --no-auto-update \
+  --stream off \
+  --no-custom-instructions \
+  --no-ask-user \
+  --available-tools= \
+  | grep -q '"ok"[[:space:]]*:[[:space:]]*true'
+then
+  fail "Copilot CLI non-interactive check failed"
+fi
+
 mkdir -p "$INSTALL_DIR" "$CONFIG_DIR" "$SYSTEMD_USER_DIR"
 
 if [[ -d "$INSTALL_DIR/.git" ]]; then
@@ -99,11 +116,22 @@ log "Installing package"
 log "Writing env file: $ENV_FILE"
 cat > "$ENV_FILE" <<EOF
 COPILOT_SERVICE_PROVIDER=shell
-COPILOT_SERVICE_SHELL_COMMAND=$COPILOT_BIN ask --stdin
+COPILOT_SERVICE_SHELL_MODE=argv
+COPILOT_SERVICE_SHELL_COMMAND=$COPILOT_BIN
 COPILOT_SERVICE_MODEL=$MODEL
 COPILOT_SERVICE_TIMEOUT_SECONDS=$TIMEOUT
 COPILOT_SERVICE_HOST=$HOST
 COPILOT_SERVICE_PORT=$PORT
+
+# GitHub Copilot CLI non-interactive mode options
+COPILOT_SERVICE_COPILOT_SILENT=true
+COPILOT_SERVICE_COPILOT_NO_COLOR=true
+COPILOT_SERVICE_COPILOT_NO_AUTO_UPDATE=true
+COPILOT_SERVICE_COPILOT_STREAM=off
+COPILOT_SERVICE_COPILOT_NO_CUSTOM_INSTRUCTIONS=true
+COPILOT_SERVICE_COPILOT_NO_ASK_USER=true
+COPILOT_SERVICE_COPILOT_AVAILABLE_TOOLS=
+
 NO_COLOR=1
 EOF
 
