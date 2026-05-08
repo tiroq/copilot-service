@@ -23,6 +23,25 @@ class JsonExtractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             extract_json_value("not json")
 
+    def test_bullet_prefix(self):
+        """Copilot CLI may prefix output with '● '."""
+        self.assertEqual(extract_json_value('\u25cf {"ok":true}'), {"ok": True})
+
+    def test_bullet_prefix_with_spaces(self):
+        self.assertEqual(extract_json_value('  \u25cf   {"decision":"asr"}'), {"decision": "asr"})
+
+    def test_fenced_json_triple_backtick(self):
+        text = '```json\n{"ok":true}\n```'
+        self.assertEqual(extract_json_value(text), {"ok": True})
+
+    def test_text_before_and_after_json(self):
+        text = 'Some prefix text {"ok":true} some suffix text'
+        self.assertEqual(extract_json_value(text), {"ok": True})
+
+    def test_empty_raises(self):
+        with self.assertRaises(ValueError):
+            extract_json_value("")
+
 
 if __name__ == "__main__":
     unittest.main()
