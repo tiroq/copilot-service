@@ -13,6 +13,7 @@ class ProviderResult:
     stderr: str | None = None
     error: str | None = None
     returncode: int | None = None
+    provider_debug: dict | None = None
 
 
 class Provider:
