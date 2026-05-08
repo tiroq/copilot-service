@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0 - 2026-05-08
+
+- Maintenance release.
+
 ## Unreleased
 
 - Added documented API contract (`docs/api-contract.md`).
