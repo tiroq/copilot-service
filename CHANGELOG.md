@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0 - 2026-05-08
+
+- Maintenance release.
+
 All notable changes to this project will be documented in this file.
 
 ## 0.1.2 - 2026-05-08
