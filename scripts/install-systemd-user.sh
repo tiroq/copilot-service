@@ -1,4 +1,17 @@
 #!/usr/bin/env bash
+# Bootstrap installer for copilot-service.
+#
+# This script is intentionally self-contained so it can be run before
+# the Python package is installed (curl | bash bootstrap scenario).
+#
+# Once the package is installed, the preferred interface is:
+#   copilot-caas service install [flags]
+#
+# If the package is already installed and on PATH, delegate to it:
+if command -v copilot-caas >/dev/null 2>&1; then
+  exec copilot-caas service install "$@"
+fi
+
 set -euo pipefail
 
 APP_NAME="copilot-service"
