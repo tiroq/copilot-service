@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+# Uninstall copilot-service systemd user service.
+#
+# If the package is installed, the preferred interface is:
+#   copilot-caas service uninstall [flags]
+#
+# Delegate to the CLI if available:
+if command -v copilot-caas >/dev/null 2>&1; then
+  exec copilot-caas service uninstall "$@"
+fi
+
 set -euo pipefail
 
 INSTALL_DIR="${COPILOT_SERVICE_INSTALL_DIR:-$HOME/.local/share/copilot-service}"
