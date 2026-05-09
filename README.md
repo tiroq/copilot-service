@@ -69,6 +69,68 @@ export COPILOT_SERVICE_FAKE_RESPONSE='{"decision":"asr","confidence":0.8,"reason
 copilot-service ask --input examples/route-topic-request.json
 ```
 
+## Systemd user service management
+
+`copilot-caas` includes a `service` command group for managing a persistent local systemd user service.
+
+### Install
+
+```bash
+pip install -e .
+copilot-caas service install
+```
+
+Or with explicit options:
+
+```bash
+copilot-caas service install \
+  --source-dir /path/to/repo \
+  --copilot-bin /path/to/copilot \
+  --model gpt-5-mini \
+  --host 127.0.0.1 \
+  --port 8765
+```
+
+The installer:
+- Detects and validates the Copilot CLI binary (with a 20-second timeout per candidate).
+- Creates `~/.local/share/copilot-service/` with a dedicated venv.
+- Writes `~/.config/copilot-service/env` with `COPILOT_SERVICE_SHELL_MODE=argv`.
+- Writes `~/.config/systemd/user/copilot-service.service` and enables it.
+- Runs a health check and a provider smoke test.
+
+Skip the smoke test (e.g. for CI):
+
+```bash
+copilot-caas service install --skip-provider-smoke
+# or
+COPILOT_SERVICE_SKIP_PROVIDER_SMOKE=1 copilot-caas service install
+```
+
+### Other service commands
+
+```bash
+copilot-caas service status    # systemctl status + /health
+copilot-caas service restart   # restart + health check
+copilot-caas service logs      # journalctl (last 120 lines)
+copilot-caas service logs -f   # follow logs
+copilot-caas service logs -n 50
+copilot-caas service test      # diagnostics + provider smoke test
+copilot-caas service uninstall
+copilot-caas service uninstall --remove-config --remove-install-dir --yes
+```
+
+### Autostart after reboot
+
+The service runs as a systemd **user** unit — it only starts when you log in.
+For headless/server setups where no interactive session exists:
+
+```bash
+sudo loginctl enable-linger "$USER"
+```
+
+> **Security:** The REST server binds to `127.0.0.1` by default.
+> Do **not** bind to `0.0.0.0` unless you have auth, a reverse proxy, or a firewall in place.
+
 ## Quickstart (shell provider)
 
 ```bash
